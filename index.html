@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Runtracker</title>
+<meta name="theme-color" content="#15171A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- TRACK VIEW -->
+  <section class="view active" id="view-track">
+
+    <div id="idle-panel">
+      <div class="hero">
+        <h1>Ready to run</h1>
+        <p>Your route is drawn from raw GPS points<br>and everything stays on this phone.</p>
+        <div class="gps-badge" id="gps-badge"><span class="dot"></span><span id="gps-badge-text">Checking GPS…</span></div>
+      </div>
+      <div id="error-slot"></div>
+      <button class="btn btn-start" id="btn-start">Start run</button>
+    </div>
+
+    <div id="active-panel" style="display:none;">
+      <div class="status-row">
+        <span id="run-date"></span>
+        <span class="live" id="live-indicator"><span class="dot"></span><span id="live-text">Tracking</span></span>
+      </div>
+
+      <div class="timer" id="stat-time">00:00:00</div>
+
+      <div class="route-box">
+        <canvas id="route-canvas"></canvas>
+        <div class="empty-hint" id="route-empty">Waiting for your first GPS fix…</div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="label">Distance</div>
+          <div class="value" id="stat-distance">0.00<span class="unit"> km</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Pace</div>
+          <div class="value" id="stat-pace">–:––<span class="unit"> /km</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Elev gain</div>
+          <div class="value" id="stat-elev">–<span class="unit"> m</span></div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-pause" id="btn-pause">Pause</button>
+        <button class="btn btn-finish" id="btn-finish">Finish</button>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- HISTORY VIEW -->
+  <section class="view" id="view-history">
+    <div class="view-header">
+      <h2>History</h2>
+      <span id="history-count"></span>
+    </div>
+    <div id="history-list"></div>
+  </section>
+
+</div>
+
+<nav class="tabbar">
+  <button id="tab-track" class="active">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+    Track
+  </button>
+  <button id="tab-history">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    History
+  </button>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>

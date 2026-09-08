@@ -1,0 +1,252 @@
+:root {
+  --bg: #15171A;
+  --surface: #1E2126;
+  --surface-raised: #24272D;
+  --border: #2C3037;
+  --text: #EDEDE8;
+  --text-dim: #9A9DA6;
+  --text-faint: #62666F;
+  --lime: #C9F031;
+  --teal: #6FE3B4;
+  --coral: #E2574B;
+  --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 76px;
+}
+
+.view { display: none; padding: 20px 20px 8px; }
+.view.active { display: block; }
+
+/* ---- top status row ---- */
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 4px 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.status-row .live {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--teal);
+}
+.status-row .live .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--teal);
+}
+.status-row .live.paused .dot { background: var(--text-faint); }
+.status-row .live.paused { color: var(--text-faint); }
+
+/* ---- idle / hero ---- */
+.hero {
+  text-align: center;
+  padding: 48px 0 32px;
+}
+.hero h1 {
+  font-size: 17px;
+  font-weight: 500;
+  margin: 0 0 6px;
+  letter-spacing: 0.2px;
+}
+.hero p {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.gps-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 18px;
+  font-family: var(--mono);
+}
+.gps-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); }
+.gps-badge.ready .dot { background: var(--teal); }
+.gps-badge.ready { color: var(--teal); }
+.gps-badge.error .dot { background: var(--coral); }
+.gps-badge.error { color: var(--coral); }
+
+/* ---- big stopwatch numerals ---- */
+.timer {
+  font-family: var(--mono);
+  font-size: 56px;
+  font-weight: 500;
+  text-align: center;
+  letter-spacing: 1px;
+  margin: 4px 0 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- route canvas ---- */
+.route-box {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  height: 200px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.route-box canvas { width: 100%; height: 100%; display: block; }
+.route-box .empty-hint {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-faint); font-size: 13px;
+}
+
+/* ---- stat grid ---- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 12px 8px;
+  text-align: center;
+}
+.stat-card .label {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+.stat-card .value {
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 500;
+}
+.stat-card .unit {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/* ---- buttons ---- */
+button {
+  font-family: var(--sans);
+  cursor: pointer;
+}
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 15px 0;
+  font-size: 15px;
+  font-weight: 500;
+  width: 100%;
+}
+.btn-row { display: flex; gap: 10px; }
+.btn-row .btn { flex: 1; }
+.btn-start { background: var(--lime); color: #1A1E0A; }
+.btn-pause { background: var(--surface-raised); color: var(--text); border: 0.5px solid var(--border); }
+.btn-resume { background: var(--teal); color: #062018; }
+.btn-finish { background: var(--coral); color: #2A0C09; }
+.btn-ghost {
+  background: transparent;
+  color: var(--text-dim);
+  border: 0.5px solid var(--border);
+}
+.btn:active { transform: scale(0.98); }
+
+/* ---- history ---- */
+.view-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 16px 4px 14px;
+}
+.view-header h2 { font-size: 17px; font-weight: 500; margin: 0; }
+.view-header span { font-size: 13px; color: var(--text-faint); }
+
+.run-row {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.run-row .sparkline { width: 48px; height: 48px; flex-shrink: 0; }
+.run-row .info { flex: 1; min-width: 0; }
+.run-row .date { font-size: 13px; color: var(--text-dim); margin: 0 0 3px; }
+.run-row .metrics { font-family: var(--mono); font-size: 15px; margin: 0; }
+.run-row .metrics span { color: var(--text-faint); font-size: 12px; margin-left: 3px; font-family: var(--sans); }
+.run-row .metrics b { margin-right: 10px; }
+.run-row .delete-btn {
+  background: none; border: none; color: var(--text-faint);
+  font-size: 18px; padding: 4px 6px; line-height: 1;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-faint);
+}
+.empty-state p { margin: 6px 0 0; font-size: 14px; line-height: 1.6; }
+
+/* ---- bottom tab bar ---- */
+.tabbar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-top: 0.5px solid var(--border);
+  display: flex;
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+}
+.tabbar button {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 12px;
+  padding: 8px 0 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.tabbar button.active { color: var(--lime); }
+.tabbar i { font-size: 20px; }
+
+.error-banner {
+  background: rgba(226,87,75,0.12);
+  border: 0.5px solid var(--coral);
+  color: var(--coral);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
