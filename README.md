@@ -32,7 +32,14 @@ Once you have the https link:
 - Route drawn as a plain line from your raw GPS points — no map tiles, so
   it works with zero connectivity.
 - Pause/resume that doesn't count distance across the paused gap.
-- Run history with per-run route thumbnails, and delete.
+- Per-km/mi split times, live during a run and saved with it.
+- Screen-wake lock while tracking (falls back gracefully on browsers that
+  don't support the Wake Lock API — screen may sleep on those).
+- Manual run entry, for logging a run without GPS.
+- Run history with per-run route thumbnails, tap-to-expand splits, a
+  share/copy button, and delete.
+- This week / this month totals on the History tab.
+- km ↔ mi toggle (top right) — applies to every screen.
 - Installable as a home-screen app with offline shell caching.
 
 ## Known limitation

@@ -17,6 +17,11 @@
 
 <div id="app">
 
+  <header class="topbar">
+    <span class="brand">Runtracker</span>
+    <button id="unit-toggle" class="unit-toggle">km</button>
+  </header>
+
   <!-- TRACK VIEW -->
   <section class="view active" id="view-track">
 
@@ -28,6 +33,7 @@
       </div>
       <div id="error-slot"></div>
       <button class="btn btn-start" id="btn-start">Start run</button>
+      <button class="btn btn-ghost" id="btn-manual-open" style="margin-top:10px;">Log a past run manually</button>
     </div>
 
     <div id="active-panel" style="display:none;">
@@ -58,6 +64,8 @@
         </div>
       </div>
 
+      <div class="split-list" id="live-splits"></div>
+
       <div class="btn-row">
         <button class="btn btn-pause" id="btn-pause">Pause</button>
         <button class="btn btn-finish" id="btn-finish">Finish</button>
@@ -70,8 +78,22 @@
   <section class="view" id="view-history">
     <div class="view-header">
       <h2>History</h2>
-      <span id="history-count"></span>
+      <button class="add-btn" id="btn-manual-open-2" aria-label="Log a past run">+</button>
     </div>
+
+    <div class="totals-row" id="totals-row" style="display:none;">
+      <div class="stat-card">
+        <div class="label">This week</div>
+        <div class="value" id="totals-week-dist">0.0<span class="unit"> km</span></div>
+        <div class="sub" id="totals-week-time">0h 00m</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">This month</div>
+        <div class="value" id="totals-month-dist">0.0<span class="unit"> km</span></div>
+        <div class="sub" id="totals-month-time">0h 00m</div>
+      </div>
+    </div>
+
     <div id="history-list"></div>
   </section>
 
@@ -87,6 +109,37 @@
     History
   </button>
 </nav>
+
+<!-- MANUAL ENTRY MODAL -->
+<div class="modal-backdrop" id="manual-backdrop">
+  <div class="modal">
+    <h3>Log a past run</h3>
+    <label>Date
+      <input type="date" id="manual-date">
+    </label>
+    <label>Distance (<span id="manual-unit-label">km</span>)
+      <input type="number" id="manual-distance" step="0.01" min="0" inputmode="decimal" placeholder="5.00">
+    </label>
+    <div class="modal-time-row">
+      <label>Hours
+        <input type="number" id="manual-h" min="0" inputmode="numeric" placeholder="0">
+      </label>
+      <label>Minutes
+        <input type="number" id="manual-m" min="0" max="59" inputmode="numeric" placeholder="30">
+      </label>
+      <label>Seconds
+        <input type="number" id="manual-s" min="0" max="59" inputmode="numeric" placeholder="0">
+      </label>
+    </div>
+    <div id="manual-error" class="error-banner" style="display:none;"></div>
+    <div class="btn-row" style="margin-top:6px;">
+      <button class="btn btn-ghost" id="btn-manual-cancel">Cancel</button>
+      <button class="btn btn-start" id="btn-manual-save">Save run</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script src="app.js"></script>
 </body>
