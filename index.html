@@ -12,6 +12,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="style.css">
+<script>
+  // Apply saved theme before first paint to avoid a flash of the wrong theme.
+  try {
+    if (localStorage.getItem('runtracker_theme') === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  } catch (e) {}
+</script>
 </head>
 <body>
 
@@ -33,7 +41,26 @@
       </div>
       <div id="error-slot"></div>
       <button class="btn btn-start" id="btn-start">Start run</button>
-      <button class="btn btn-ghost" id="btn-manual-open" style="margin-top:10px;">Log a past run manually</button>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-ghost" id="btn-manual-open">Log manually</button>
+        <button class="btn btn-ghost" id="btn-treadmill-open">Treadmill mode</button>
+      </div>
+    </div>
+
+    <!-- TREADMILL (indoor, no GPS) PANEL -->
+    <div id="treadmill-panel" style="display:none;">
+      <div class="hero" style="padding-top:24px;">
+        <h1>Treadmill mode</h1>
+        <p>No GPS — distance is calculated from<br>elapsed time and the pace you set.</p>
+      </div>
+      <label class="field-label">Target pace (min per <span id="treadmill-unit-label">km</span>)
+        <input type="number" id="treadmill-pace" step="0.1" min="1" inputmode="decimal" placeholder="5.5">
+      </label>
+      <div id="treadmill-error" class="error-banner" style="display:none;"></div>
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-ghost" id="btn-treadmill-cancel">Back</button>
+        <button class="btn btn-start" id="btn-treadmill-start">Start</button>
+      </div>
     </div>
 
     <div id="active-panel" style="display:none;">
@@ -44,7 +71,7 @@
 
       <div class="timer" id="stat-time">00:00:00</div>
 
-      <div class="route-box">
+      <div class="route-box" id="route-box">
         <canvas id="route-canvas"></canvas>
         <div class="empty-hint" id="route-empty">Waiting for your first GPS fix…</div>
       </div>
@@ -94,7 +121,98 @@
       </div>
     </div>
 
+    <div class="records-row" id="records-row" style="display:none;">
+      <div class="stat-card">
+        <div class="label">Best pace</div>
+        <div class="value" id="record-pace">–:––<span class="unit"> /km</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Longest run</div>
+        <div class="value" id="record-distance">–<span class="unit"> km</span></div>
+      </div>
+    </div>
+
+    <div class="streak-wrap" id="streak-wrap" style="display:none;">
+      <p class="streak-label">Last 10 weeks</p>
+      <div class="streak-grid" id="streak-grid"></div>
+    </div>
+
     <div id="history-list"></div>
+  </section>
+
+  <!-- SQUAD VIEW -->
+  <section class="view" id="view-squad">
+    <div class="view-header"><h2>Squad</h2></div>
+
+    <div id="squad-unconfigured">
+      <div class="empty-state">
+        <p>Squad needs a Supabase project connected first.<br>Set that up in Settings, then come back here.</p>
+      </div>
+    </div>
+
+    <div id="squad-join" style="display:none;">
+      <p class="field-label">Your name</p>
+      <input type="text" id="squad-name" placeholder="e.g. Senn">
+      <p class="field-label" style="margin-top:12px;">Squad code</p>
+      <input type="text" id="squad-code" placeholder="e.g. lagos-runners">
+      <p class="hint-text">Anyone using the same code sees the same leaderboard. Share it with your friend.</p>
+      <button class="btn btn-start" id="btn-squad-join" style="margin-top:14px;">Join squad</button>
+    </div>
+
+    <div id="squad-board" style="display:none;">
+      <div class="squad-header-row">
+        <span id="squad-code-label"></span>
+        <button class="btn-ghost-sm" id="btn-squad-leave">Leave</button>
+      </div>
+      <p class="squad-sub">This week, by distance</p>
+      <div id="squad-list"></div>
+      <button class="btn btn-ghost" id="btn-squad-refresh" style="margin-top:12px;">Refresh</button>
+    </div>
+  </section>
+
+  <!-- SETTINGS VIEW -->
+  <section class="view" id="view-settings">
+    <div class="view-header"><h2>Settings</h2></div>
+
+    <div class="settings-group">
+      <div class="settings-row">
+        <div><p class="settings-title">Light theme</p><p class="settings-desc">Easier to see in bright daylight</p></div>
+        <button class="toggle" id="toggle-theme"><span class="knob"></span></button>
+      </div>
+      <div class="settings-row">
+        <div><p class="settings-title">Auto-pause</p><p class="settings-desc">Pauses when you stop moving, resumes when you start</p></div>
+        <button class="toggle" id="toggle-autopause"><span class="knob"></span></button>
+      </div>
+      <div class="settings-row">
+        <div><p class="settings-title">Audio split cues</p><p class="settings-desc">Announces each split out loud</p></div>
+        <button class="toggle" id="toggle-audio"><span class="knob"></span></button>
+      </div>
+      <div class="settings-row">
+        <div><p class="settings-title">Live notification</p><p class="settings-desc">Shows stats in the notification shade while tracking. Only updates while the app is open in front of you — Android still stops background GPS once you leave the tab.</p></div>
+        <button class="toggle" id="toggle-notify"><span class="knob"></span></button>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <p class="settings-group-title">Data</p>
+      <button class="btn btn-ghost" id="btn-export-data">Export all runs (backup)</button>
+      <label class="btn btn-ghost" for="import-file" style="display:block; text-align:center; margin-top:10px; cursor:pointer;">Import runs</label>
+      <input type="file" id="import-file" accept="application/json" style="display:none;">
+      <p id="data-status" class="hint-text" style="margin-top:8px;"></p>
+    </div>
+
+    <div class="settings-group">
+      <p class="settings-group-title">Squad / Supabase</p>
+      <label class="field-label">Project URL
+        <input type="text" id="supabase-url" placeholder="https://xxxx.supabase.co">
+      </label>
+      <label class="field-label">Anon public key
+        <input type="text" id="supabase-key" placeholder="eyJ...">
+      </label>
+      <button class="btn btn-ghost" id="btn-supabase-save" style="margin-top:6px;">Save connection</button>
+      <p id="supabase-status" class="hint-text" style="margin-top:8px;"></p>
+    </div>
+
   </section>
 
 </div>
@@ -108,26 +226,34 @@
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
     History
   </button>
+  <button id="tab-squad">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="9" r="3"/><circle cx="17" cy="10" r="2.4"/><path d="M3 20c0-3 2.2-5 5-5s5 2 5 5M15 20c0-2.5 1.7-4.3 4-4.3"/></svg>
+    Squad
+  </button>
+  <button id="tab-settings">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 01-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 010-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001-1.55V3a2 2 0 014 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.55 1H21a2 2 0 010 4h-.09a1.7 1.7 0 00-1.55 1z"/></svg>
+    Settings
+  </button>
 </nav>
 
 <!-- MANUAL ENTRY MODAL -->
 <div class="modal-backdrop" id="manual-backdrop">
   <div class="modal">
     <h3>Log a past run</h3>
-    <label>Date
+    <label class="field-label">Date
       <input type="date" id="manual-date">
     </label>
-    <label>Distance (<span id="manual-unit-label">km</span>)
+    <label class="field-label">Distance (<span id="manual-unit-label">km</span>)
       <input type="number" id="manual-distance" step="0.01" min="0" inputmode="decimal" placeholder="5.00">
     </label>
     <div class="modal-time-row">
-      <label>Hours
+      <label class="field-label">Hours
         <input type="number" id="manual-h" min="0" inputmode="numeric" placeholder="0">
       </label>
-      <label>Minutes
+      <label class="field-label">Minutes
         <input type="number" id="manual-m" min="0" max="59" inputmode="numeric" placeholder="30">
       </label>
-      <label>Seconds
+      <label class="field-label">Seconds
         <input type="number" id="manual-s" min="0" max="59" inputmode="numeric" placeholder="0">
       </label>
     </div>
@@ -141,6 +267,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

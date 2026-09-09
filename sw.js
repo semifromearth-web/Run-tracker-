@@ -1,4 +1,4 @@
-const CACHE = 'runtracker-v2';
+const CACHE = 'runtracker-v3';
 const SHELL = ['./', './index.html', './style.css', './app.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
@@ -14,6 +14,13 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) {
+    // Cross-origin (CDN script, Supabase API calls): let these go straight to the
+    // network as normal fetches. We don't want a stale cached leaderboard response,
+    // and Supabase writes must always hit the real network.
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request).then(res => {
       const copy = res.clone();
