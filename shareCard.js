@@ -24,7 +24,7 @@ const THEME = {
   bg: '#141414',
   text: '#F2F2EF',
   label: '#B9B9B3',
-  route: '#7C9A24',   // app's olive green accent
+  route: '#C4602A',   // matches the app's olive/burnt accent; swap to taste
   routeWidth: 10,
 };
 
@@ -145,4 +145,38 @@ function drawRouteTrace(ctx, points, box) {
     else ctx.lineTo(x, y);
   });
   ctx.stroke();
+}
+
+/**
+ * Drop-in replacement for the existing text-only share handler.
+ * Tries the native share sheet with the image attached (works on most
+ * Android browsers + iOS Safari); falls back to a plain download if the
+ * browser can't share files.
+ *
+ * Usage in your History view's share button onClick:
+ *   shareStatsCardNative(run, { format: '9:16' });
+ */
+export async function shareStatsCardNative(run, opts = {}) {
+  const format = opts.format === '1:1' ? '1:1' : '9:16';
+  const canvas = renderStatsCard(run, format);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  const file = new File([blob], `run-${Date.now()}.png`, { type: 'image/png' });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: 'My run',
+      });
+      return;
+    } catch (err) {
+      // user cancelled the share sheet — not an error, just stop here
+      if (err.name === 'AbortError') return;
+    }
+  }
+
+  // Fallback: browser can't share image files (older browsers / some
+  // Android WebViews) — just download it instead.
+  exportStatsCard(run, { format });
 }
