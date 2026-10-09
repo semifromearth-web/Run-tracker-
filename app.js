@@ -664,18 +664,14 @@ function saveManualRun() {
 }
 
 /* ---------- share ---------- */
-function shareRun(run) {shareStatsCardNative(run, { format: '9:16' });
-  const dist = toDisplayDistance(run.distanceKm).toFixed(2);
-  const pace = formatPace(toDisplayPaceSec(run.paceSecPerKm));
-  let text = `${dist} ${unit} run on ${formatDate(run.date)} — ${formatTime(run.durationS)}, avg pace ${pace}/${unit}`;
-  if (run.elevGainM) text += `, +${run.elevGainM}m elevation gain`;
-  if (navigator.share) {
-    navigator.share({ text }).catch(() => {});
-  } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard')).catch(() => showToast(text));
-  } else {
-    showToast(text);
-  }
+function shareRun(run) {
+  shareStatsCardNative({
+    distanceKm: run.distanceKm,
+    paceLabel: formatPace(run.paceSecPerKm),
+    durationLabel: formatTime(run.durationS),
+    points: run.points,
+  }, { format: '9:16' });
+    }
 }
 
 /* ---------- totals / records / streak ---------- */
