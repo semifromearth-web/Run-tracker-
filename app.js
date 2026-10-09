@@ -1,5 +1,19 @@
 /* ---------- storage keys ---------- */
-import { shareStatsCardNative } from './shareCard.js';
+import { shareStatsCardNative } from './statsCard.js';
+
+/* one-time cache reset so updated files load (bump APP_BUILD to force again) */
+const APP_BUILD = '2026-10-09-card';
+if (localStorage.getItem('runtracker_build') !== APP_BUILD) {
+  localStorage.setItem('runtracker_build', APP_BUILD);
+  (async () => {
+    try {
+      const regs = (navigator.serviceWorker && await navigator.serviceWorker.getRegistrations()) || [];
+      await Promise.all(regs.map(r => r.unregister()));
+      if (window.caches) { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); }
+      if (regs.length) location.reload(); // sw.js re-registers below, recaching fresh files
+    } catch (e) {}
+  })();
+}
 const STORE_KEY = 'runtracker_runs';
 const UNIT_KEY = 'runtracker_unit';
 
