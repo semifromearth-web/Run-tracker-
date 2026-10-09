@@ -1,5 +1,5 @@
-/* ---------- storage keys ---------- *
-/import { shareStatsCardNative } from './shareCard.js';
+/* ---------- storage keys ---------- */
+import { shareStatsCardNative } from './shareCard.js';
 const STORE_KEY = 'runtracker_runs';
 const UNIT_KEY = 'runtracker_unit';
 
@@ -672,8 +672,6 @@ function shareRun(run) {
     points: run.points,
   }, { format: '9:16' });
     }
-}
-
 /* ---------- totals / records / streak ---------- */
 function startOfWeek(d) {
   const day = (d.getDay() + 6) % 7;
