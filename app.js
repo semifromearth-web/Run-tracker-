@@ -1,4 +1,4 @@
-/* ---------- storage keys ---------- */
+/* ---------- storage keys ---------- */import { shareStatsCardNative } from './shareCard.js';
 const STORE_KEY = 'runtracker_runs';
 const UNIT_KEY = 'runtracker_unit';
 
@@ -663,7 +663,7 @@ function saveManualRun() {
 }
 
 /* ---------- share ---------- */
-function shareRun(run) {
+function shareRun(run) {shareStatsCardNative(run, { format: '9:16' });
   const dist = toDisplayDistance(run.distanceKm).toFixed(2);
   const pace = formatPace(toDisplayPaceSec(run.paceSecPerKm));
   let text = `${dist} ${unit} run on ${formatDate(run.date)} — ${formatTime(run.durationS)}, avg pace ${pace}/${unit}`;
