@@ -1,182 +1,122 @@
-/**
- * shareCard.js — Shareable stats-card export for the run tracker PWA.
- * Fully client-side (canvas), no network calls — matches the app's offline-first design.
- *
- * Usage:
- *   import { exportStatsCard } from './shareCard.js';
- *   exportStatsCard(run, { format: '9:16' });   // or '1:1'
- *
- * `run` shape expected:
- *   {
- *     distanceKm: 4.34,
- *     paceLabel: "10:07",      // per-km pace, already formatted mm:ss
- *     durationLabel: "43m 54s",
- *     points: [{ lat, lng }, ...]   // raw GPS points for the route trace
- *   }
- */
+// shareCard.js — transparent-background run stats overlay (PNG with alpha)
+// Drop-in replacement: same export name app.js already imports.
 
-const SIZES = {
-  '9:16': { w: 1080, h: 1920 },
-  '1:1':  { w: 1080, h: 1080 },
-};
+const SIZES = { '9:16': [1080, 1920], '1:1': [1080, 1080] };
+const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+const ORANGE = '#FC4C02';
 
-const THEME = {
-  bg: '#141414',
-  text: '#F2F2EF',
-  label: '#B9B9B3',
-  route: '#C4602A',   // matches the app's olive/burnt accent; swap to taste
-  routeWidth: 10,
-};
-
-export function exportStatsCard(run, opts = {}) {
-  const format = opts.format === '1:1' ? '1:1' : '9:16';
-  const canvas = renderStatsCard(run, format);
-  canvas.toBlob((blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `run-${Date.now()}-${format.replace(':', 'x')}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }, 'image/png');
+function setShadow(ctx, on) {
+  // soft shadow keeps white text readable on bright photos
+  ctx.shadowColor = on ? 'rgba(0,0,0,0.45)' : 'transparent';
+  ctx.shadowBlur = on ? 14 : 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = on ? 3 : 0;
 }
 
-// Renders and returns the <canvas> itself, in case the caller wants to
-// preview it (e.g. show it in a modal) before downloading / sharing.
-export function renderStatsCard(run, format = '9:16') {
-  const { w, h } = SIZES[format] || SIZES['9:16'];
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
+function drawRoute(ctx, points, box) {
+  if (!points || points.length < 2) return;
+  const midLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
+  const kx = Math.cos(midLat * Math.PI / 180); // keep route shape undistorted
+  const xs = points.map(p => p.lng * kx), ys = points.map(p => p.lat);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const spanX = (maxX - minX) || 1e-6, spanY = (maxY - minY) || 1e-6;
+  const scale = Math.min(box.w / spanX, box.h / spanY);
+  const offX = box.x + (box.w - spanX * scale) / 2;
+  const offY = box.y + (box.h - spanY * scale) / 2;
+  const toXY = p => [offX + (p.lng * kx - minX) * scale, offY + (maxY - p.lat) * scale];
 
-  // Background
-  ctx.fillStyle = THEME.bg;
-  ctx.fillRect(0, 0, w, h);
-
-  const centerX = w / 2;
-  const square = format === '1:1';
-
-  // --- Stats block ---
-  const stats = [
-    { label: 'Distance', value: `${run.distanceKm.toFixed(2)} km` },
-    { label: 'Pace',     value: `${run.paceLabel} /km` },
-    { label: 'Time',     value: run.durationLabel },
-  ];
-
-  let y = square ? h * 0.10 : h * 0.14;
-  const labelFont = Math.round(w * (square ? 0.034 : 0.036));
-  const valueFont = Math.round(w * (square ? 0.075 : 0.082));
-  const blockGap = square ? h * 0.07 : h * 0.065;
-
-  stats.forEach((s) => {
-    ctx.textAlign = 'center';
-    ctx.fillStyle = THEME.label;
-    ctx.font = `700 ${labelFont}px system-ui, -apple-system, sans-serif`;
-    ctx.fillText(s.label, centerX, y);
-
-    y += valueFont * 0.95;
-    ctx.fillStyle = THEME.text;
-    ctx.font = `800 ${valueFont}px system-ui, -apple-system, sans-serif`;
-    ctx.fillText(s.value, centerX, y);
-
-    y += blockGap;
+  ctx.save();
+  setShadow(ctx, true);
+  ctx.strokeStyle = ORANGE;
+  ctx.lineWidth = 14;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  let seg = null;
+  ctx.beginPath();
+  points.forEach(p => {
+    const [x, y] = toXY(p);
+    if (p.seg !== seg) { ctx.moveTo(x, y); seg = p.seg; } else ctx.lineTo(x, y);
   });
+  ctx.stroke();
 
-  // --- Route trace ---
-  if (run.points && run.points.length > 1) {
-    drawRouteTrace(ctx, run.points, {
-      top: y + (square ? h * 0.02 : h * 0.02),
-      bottom: square ? h * 0.80 : h * 0.72,
-      left: w * 0.14,
-      right: w * 0.86,
-      color: THEME.route,
-      lineWidth: THEME.routeWidth,
-    });
+  // start + end dots
+  const [sx, sy] = toXY(points[0]);
+  const [ex, ey] = toXY(points[points.length - 1]);
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(sx, sy, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(ex, ey, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawStat(ctx, label, value, unit, x, y, labelSize, valueSize) {
+  ctx.save();
+  setShadow(ctx, true);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = `600 ${labelSize}px ${FONT}`;
+  ctx.textBaseline = 'alphabetic';
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
+  ctx.fillText(label.toUpperCase(), x, y);
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+
+  ctx.fillStyle = '#fff';
+  ctx.font = `800 ${valueSize}px ${FONT}`;
+  const vy = y + valueSize * 0.95;
+  ctx.fillText(value, x, vy);
+  if (unit) {
+    const w = ctx.measureText(value).width;
+    ctx.font = `700 ${valueSize * 0.38}px ${FONT}`;
+    ctx.fillText(unit, x + w + 14, vy);
   }
+  ctx.restore();
+}
 
-  // --- Footer / logo mark ---
-  ctx.textAlign = 'center';
-  ctx.fillStyle = THEME.text;
-  ctx.font = `800 ${Math.round(w * 0.055)}px system-ui, -apple-system, sans-serif`;
-  ctx.fillText('RUNTRACKER', centerX, h * (square ? 0.93 : 0.945));
+export function renderStatsCard(stats, { format = '9:16' } = {}) {
+  const [W, H] = SIZES[format] || SIZES['9:16'];
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H); // fully transparent — no background fill anywhere
 
+  const distance = stats.distanceLabel
+    || (stats.distanceKm != null ? Number(stats.distanceKm).toFixed(2) : '--');
+  const distUnit = stats.distanceUnit || (stats.distanceLabel ? '' : 'km');
+  const paceUnit = stats.paceUnit || '';
+  const hasRoute = stats.points && stats.points.length > 1;
+
+  if (format === '1:1') {
+    // stats stacked on the left, route on the right
+    const x = 90;
+    drawStat(ctx, 'Distance', distance, distUnit, x, 150, 30, 100);
+    drawStat(ctx, 'Pace', stats.paceLabel || '--', paceUnit, x, 430, 30, 100);
+    drawStat(ctx, 'Time', stats.durationLabel || '--', '', x, 710, 30, 100);
+    if (hasRoute) drawRoute(ctx, stats.points, { x: 560, y: 110, w: 430, h: 860 });
+  } else {
+    // route on top, stats stacked below (Strava-style)
+    if (hasRoute) drawRoute(ctx, stats.points, { x: 110, y: 300, w: 860, h: 780 });
+    const x = 90;
+    drawStat(ctx, 'Distance', distance, distUnit, x, 1230, 36, 130);
+    drawStat(ctx, 'Pace', stats.paceLabel || '--', paceUnit, x, 1480, 36, 130);
+    drawStat(ctx, 'Time', stats.durationLabel || '--', '', x, 1730, 36, 130);
+  }
   return canvas;
 }
 
-// Projects raw lat/lng points onto a bounded box, preserving aspect ratio,
-// and draws the trace as a smooth line — same idea as Strava's route cards.
-function drawRouteTrace(ctx, points, box) {
-  const lats = points.map(p => p.lat);
-  const lngs = points.map(p => p.lng);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+export async function shareStatsCardNative(stats, opts = {}) {
+  const canvas = renderStatsCard(stats, opts);
+  const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+  if (!blob) throw new Error('Could not render stats card');
+  const file = new File([blob], 'run-stats.png', { type: 'image/png' });
 
-  const boxW = box.right - box.left;
-  const boxH = box.bottom - box.top;
-
-  // Correct for latitude distortion so the route isn't stretched
-  const latSpan = Math.max(maxLat - minLat, 1e-6);
-  const lngSpan = Math.max(maxLng - minLng, 1e-6) * Math.cos((minLat * Math.PI) / 180);
-
-  const scale = Math.min(boxW / lngSpan, boxH / latSpan) * 0.9;
-  const drawW = lngSpan * scale;
-  const drawH = latSpan * scale;
-  const offsetX = box.left + (boxW - drawW) / 2;
-  const offsetY = box.top + (boxH - drawH) / 2;
-
-  const toXY = (p) => {
-    const x = offsetX + ((p.lng - minLng) * Math.cos((minLat * Math.PI) / 180)) * scale;
-    const y = offsetY + drawH - (p.lat - minLat) * scale;
-    return [x, y];
-  };
-
-  ctx.beginPath();
-  ctx.strokeStyle = box.color;
-  ctx.lineWidth = box.lineWidth;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-
-  points.forEach((p, i) => {
-    const [x, y] = toXY(p);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-}
-
-/**
- * Drop-in replacement for the existing text-only share handler.
- * Tries the native share sheet with the image attached (works on most
- * Android browsers + iOS Safari); falls back to a plain download if the
- * browser can't share files.
- *
- * Usage in your History view's share button onClick:
- *   shareStatsCardNative(run, { format: '9:16' });
- */
-export async function shareStatsCardNative(run, opts = {}) {
-  const format = opts.format === '1:1' ? '1:1' : '9:16';
-  const canvas = renderStatsCard(run, format);
-
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-  const file = new File([blob], `run-${Date.now()}.png`, { type: 'image/png' });
-
+  // image file only — adding title/text can make some share sheets send text instead
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: 'My run',
-      });
-      return;
-    } catch (err) {
-      // user cancelled the share sheet — not an error, just stop here
-      if (err.name === 'AbortError') return;
-    }
+    try { await navigator.share({ files: [file] }); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
   }
-
-  // Fallback: browser can't share image files (older browsers / some
-  // Android WebViews) — just download it instead.
-  exportStatsCard(run, { format });
+  // fallback: download the PNG
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'run-stats.png';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

@@ -664,14 +664,20 @@ function saveManualRun() {
 }
 
 /* ---------- share ---------- */
+const SHARE_FMT_KEY = 'runtracker_share_format';
+let shareFormat = localStorage.getItem(SHARE_FMT_KEY) === '1:1' ? '1:1' : '9:16';
+
 function shareRun(run) {
   shareStatsCardNative({
-    distanceKm: run.distanceKm,
-    paceLabel: formatPace(run.paceSecPerKm),
+    distanceLabel: toDisplayDistance(run.distanceKm).toFixed(2),
+    distanceUnit: unit,
+    paceLabel: formatPace(toDisplayPaceSec(run.paceSecPerKm)),
+    paceUnit: '/' + unit,
     durationLabel: formatTime(run.durationS),
     points: run.points,
-  }, { format: '9:16' });
-    }
+  }, { format: shareFormat }).catch(() => showToast('Could not create stats card'));
+}
+
 /* ---------- totals / records / streak ---------- */
 function startOfWeek(d) {
   const day = (d.getDay() + 6) % 7;
@@ -797,8 +803,17 @@ function toggleDetail(run) {
     splitsHtml = `<div class="split-row"><span>Treadmill run — no GPS route</span></div>`;
   }
   const gpxBtn = (run.points && run.points.length) ? `<button class="share-btn" id="gpx-btn-${run.id}">Export GPX</button>` : '';
-  detail.innerHTML = splitsHtml + `<button class="share-btn" id="share-btn-${run.id}">Share this run</button>` + gpxBtn;
+  detail.innerHTML = splitsHtml
+    + `<button class="share-btn" id="share-btn-${run.id}">Share this run</button>`
+    + `<button class="share-btn" id="fmt-btn-${run.id}">Card size: ${shareFormat}</button>`
+    + gpxBtn;
   detail.querySelector(`#share-btn-${run.id}`).addEventListener('click', () => shareRun(run));
+  const fmtEl = detail.querySelector(`#fmt-btn-${run.id}`);
+  fmtEl.addEventListener('click', () => {
+    shareFormat = shareFormat === '9:16' ? '1:1' : '9:16';
+    localStorage.setItem(SHARE_FMT_KEY, shareFormat);
+    fmtEl.textContent = `Card size: ${shareFormat}`;
+  });
   const gpxEl = document.getElementById(`gpx-btn-${run.id}`);
   if (gpxEl) gpxEl.addEventListener('click', () => downloadFile(`run-${run.date.slice(0, 10)}.gpx`, buildGPX(run), 'application/gpx+xml'));
   detail.classList.add('open');
