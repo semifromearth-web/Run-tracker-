@@ -1,19 +1,4 @@
 /* ---------- storage keys ---------- */
-import { shareStatsCardNative } from './statsCard.js';
-
-/* one-time cache reset so updated files load (bump APP_BUILD to force again) */
-const APP_BUILD = '2026-10-09-card';
-if (localStorage.getItem('runtracker_build') !== APP_BUILD) {
-  localStorage.setItem('runtracker_build', APP_BUILD);
-  (async () => {
-    try {
-      const regs = (navigator.serviceWorker && await navigator.serviceWorker.getRegistrations()) || [];
-      await Promise.all(regs.map(r => r.unregister()));
-      if (window.caches) { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); }
-      if (regs.length) location.reload(); // sw.js re-registers below, recaching fresh files
-    } catch (e) {}
-  })();
-}
 const STORE_KEY = 'runtracker_runs';
 const UNIT_KEY = 'runtracker_unit';
 
@@ -23,6 +8,7 @@ function loadRuns() {
 }
 function saveRuns(runs) {
   localStorage.setItem(STORE_KEY, JSON.stringify(runs));
+  dashSoon();
 }
 
 /* ---------- units ---------- */
@@ -678,18 +664,18 @@ function saveManualRun() {
 }
 
 /* ---------- share ---------- */
-const SHARE_FMT_KEY = 'runtracker_share_format';
-let shareFormat = localStorage.getItem(SHARE_FMT_KEY) === '1:1' ? '1:1' : '9:16';
-
 function shareRun(run) {
-  shareStatsCardNative({
-    distanceLabel: toDisplayDistance(run.distanceKm).toFixed(2),
-    distanceUnit: unit,
-    paceLabel: formatPace(toDisplayPaceSec(run.paceSecPerKm)),
-    paceUnit: '/' + unit,
-    durationLabel: formatTime(run.durationS),
-    points: run.points,
-  }, { format: shareFormat }).catch(() => showToast('Could not create stats card'));
+  const dist = toDisplayDistance(run.distanceKm).toFixed(2);
+  const pace = formatPace(toDisplayPaceSec(run.paceSecPerKm));
+  let text = `${dist} ${unit} run on ${formatDate(run.date)} — ${formatTime(run.durationS)}, avg pace ${pace}/${unit}`;
+  if (run.elevGainM) text += `, +${run.elevGainM}m elevation gain`;
+  if (navigator.share) {
+    navigator.share({ text }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard')).catch(() => showToast(text));
+  } else {
+    showToast(text);
+  }
 }
 
 /* ---------- totals / records / streak ---------- */
@@ -817,17 +803,8 @@ function toggleDetail(run) {
     splitsHtml = `<div class="split-row"><span>Treadmill run — no GPS route</span></div>`;
   }
   const gpxBtn = (run.points && run.points.length) ? `<button class="share-btn" id="gpx-btn-${run.id}">Export GPX</button>` : '';
-  detail.innerHTML = splitsHtml
-    + `<button class="share-btn" id="share-btn-${run.id}">Share this run</button>`
-    + `<button class="share-btn" id="fmt-btn-${run.id}">Card size: ${shareFormat}</button>`
-    + gpxBtn;
+  detail.innerHTML = splitsHtml + `<button class="share-btn" id="share-btn-${run.id}">Share this run</button>` + gpxBtn;
   detail.querySelector(`#share-btn-${run.id}`).addEventListener('click', () => shareRun(run));
-  const fmtEl = detail.querySelector(`#fmt-btn-${run.id}`);
-  fmtEl.addEventListener('click', () => {
-    shareFormat = shareFormat === '9:16' ? '1:1' : '9:16';
-    localStorage.setItem(SHARE_FMT_KEY, shareFormat);
-    fmtEl.textContent = `Card size: ${shareFormat}`;
-  });
   const gpxEl = document.getElementById(`gpx-btn-${run.id}`);
   if (gpxEl) gpxEl.addEventListener('click', () => downloadFile(`run-${run.date.slice(0, 10)}.gpx`, buildGPX(run), 'application/gpx+xml'));
   detail.classList.add('open');
@@ -955,6 +932,42 @@ async function flushPendingSync() {
 }
 window.addEventListener('online', flushPendingSync);
 
+/* ---------- Life Dashboard sync (stats only, never routes) ---------- */
+const DASH_URL = 'https://bkxwezpdfjevrxwtwjwq.supabase.co';
+const DASH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJreHdlenBkZmpldnJ4d3R3andxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwMDY3OTAsImV4cCI6MjEwNzU4Mjc5MH0.82cNhr0VEvHp4ojOEHScFzgq-I-8VKg45vGGNcx9Jtw';
+let dashT;
+function dashSoon() { clearTimeout(dashT); dashT = setTimeout(() => dashSync(false), 3000); }
+function dashStatus(t) { const e = document.getElementById('dash-status'); if (e) e.textContent = t; }
+async function dashSync(manual) {
+  const tok = localStorage.getItem('runtracker_dash_token');
+  if (!tok) { if (manual) dashStatus('Add your dashboard token first.'); return; }
+  if (!navigator.onLine) { if (manual) dashStatus('Offline. Will sync when back online.'); return; }
+  const rows = loadRuns().map(r => ({ run_id: r.id, day: r.date.slice(0, 10), distance_km: r.distanceKm || 0, duration_s: r.durationS || 0, pace_sec_per_km: r.paceSecPerKm ? Math.round(r.paceSecPerKm * 10) / 10 : null }));
+  const hdr = { apikey: DASH_KEY, Authorization: 'Bearer ' + DASH_KEY, 'x-owner-token': tok, 'Content-Type': 'application/json' };
+  const now = new Set(rows.map(r => r.run_id));
+  const gone = JSON.parse(localStorage.getItem('runtracker_dash_ids') || '[]').filter(id => !now.has(id));
+  try {
+    if (rows.length) {
+      const r = await fetch(DASH_URL + '/rest/v1/run_logs?on_conflict=run_id', { method: 'POST', headers: { ...hdr, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) });
+      if (!r.ok) throw new Error(r.status);
+    }
+    if (gone.length) {
+      const r = await fetch(DASH_URL + '/rest/v1/run_logs?run_id=in.(' + gone.join(',') + ')', { method: 'DELETE', headers: hdr });
+      if (!r.ok) throw new Error(r.status);
+    }
+    localStorage.setItem('runtracker_dash_ids', JSON.stringify([...now]));
+    if (manual) dashStatus('Synced ' + rows.length + ' runs to the dashboard.');
+  } catch (e) { if (manual) dashStatus('Sync failed (' + e.message + ').'); }
+}
+document.getElementById('btn-dash-save').addEventListener('click', () => {
+  const i = document.getElementById('dash-token'), v = i.value.trim();
+  if (!v) return;
+  localStorage.setItem('runtracker_dash_token', v); i.value = '';
+  dashStatus('Token saved.'); dashSync(true);
+});
+document.getElementById('btn-dash-sync').addEventListener('click', () => dashSync(true));
+window.addEventListener('online', dashSoon);
+
 /* ---------- tabs ---------- */
 function switchTab(name) {
   ['track', 'history', 'squad', 'settings'].forEach(n => {
@@ -1032,6 +1045,7 @@ applyUnitLabel();
 els['supabase-url'].value = sbUrl;
 els['supabase-key'].value = sbKey;
 if (sbUrl && sbKey) { initSupabase(); flushPendingSync(); }
+dashSoon();
 checkGps();
 
 if ('serviceWorker' in navigator) {

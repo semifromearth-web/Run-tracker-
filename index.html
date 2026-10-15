@@ -202,6 +202,16 @@
     </div>
 
     <div class="settings-group">
+      <p class="settings-group-title">Life Dashboard</p>
+      <label class="field-label">Owner token
+        <input type="password" id="dash-token" placeholder="Paste your owner token" autocomplete="off">
+      </label>
+      <button class="btn btn-ghost" id="btn-dash-save" style="margin-top:6px;">Save token &amp; sync</button>
+      <button class="btn btn-ghost" id="btn-dash-sync" style="margin-top:6px;">Sync now</button>
+      <p id="dash-status" class="hint-text" style="margin-top:8px;"></p>
+    </div>
+
+    <div class="settings-group">
       <p class="settings-group-title">Squad / Supabase</p>
       <label class="field-label">Project URL
         <input type="text" id="supabase-url" placeholder="https://xxxx.supabase.co">
